@@ -1,0 +1,17 @@
+{application, cowboy_digest_auth,
+ [{description, "Cowboy application with digest authentictation"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { cowboy_digest_auth, []}},
+  {applications,
+   [kernel,
+    stdlib,
+    cowboy
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, ["Apache 2.0"]},
+  {links, []}
+ ]}.

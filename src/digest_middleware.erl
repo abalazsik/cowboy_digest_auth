@@ -24,24 +24,25 @@ digestAuthentication(Req, State) ->
             Method = cowboy_req:method(Req),
             RealUri = getDigestUri(Req), %% the authentication header has a property that describes the uri, but we don't trust the user
             Response = erlang:binary_to_list(proplists:get_value(<<"response">>, Props)),
+            Opaque = erlang:binary_to_list(proplists:get_value(<<"opaque">>, Props)),
             case digestHash(getUsername(), Realm, getPassword(), Method, RealUri, Nonce) of
                 Response -> 
-                    Req1 = setDigestHeader(Req),
+                    Req1 = setDigestHeader(Req, Opaque),
                     {ok, Req1, State};
                 _ ->
-                    Req1 = setDigestHeader(Req),
+                    Req1 = setDigestHeader(Req, Opaque),
                     {stop, cowboy_req:reply(401, Req1)}
             end; 
 	    _ ->
-	        Req1 = setDigestHeader(Req),
+	        Req1 = setDigestHeader(Req, erlang:integer_to_list(rand:uniform(?MAXNOONCE), 16)),
             {stop, cowboy_req:reply(401, Req1)}
             
     end.
 
-setDigestHeader(Req) ->
+setDigestHeader(Req, Opaque) ->
     Nonce = rand:uniform(?MAXNOONCE),
     Str = erlang:integer_to_list(Nonce, 16),
-    Bin =  erlang:list_to_binary(["digest realm=\"cowboy\"  algorithm=\"MD5\" nonce=\"", Str, "\""]),
+    Bin =  erlang:list_to_binary(["digest realm=\"cowboy\", nonce=\"", Str, "\", opaque=\"",Opaque,"\""]),
     cowboy_req:set_resp_header(<<"www-authenticate">>, Bin, Req).
 
 getDigestUri(Req) ->

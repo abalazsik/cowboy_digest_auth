@@ -62,13 +62,13 @@ digestHash(Username, Realm, Password, Method, DigestUri, Nonce) ->
     HA2 = toHex(erlang:md5([Method, ":", DigestUri])),
     toHex(erlang:md5(([HA1, ":", Nonce, ":", HA2]))).
 
-toHex(List) when is_binary(List) ->
-    Hex = fun
-            (X) when X < 16 -> "0" ++ erlang:integer_to_list(X,16);
-            (X) -> erlang:integer_to_list(X,16)
-        end,
+toHex(Bin) when is_binary(Bin) ->
+    [hexChar(X) || <<X:4>> <= Bin].
 
-    string:to_lower(lists:flatten([Hex(X) || <<X:8>> <= List])).
+hexChar(Num) when Num < 10 andalso Num >= 0-> 
+    $0 + Num;
+hexChar(Num) when Num < 16 -> 
+    $a + Num - 10.
 
 getUsername() ->
     ?USERNAME.

@@ -4,9 +4,10 @@
 
 -behaviour(cowboy_middleware).
 
--define(USERNAME, "username").
--define(PASSWORD, "password").
--define(MAXNOONCE, 30000).
+-define(REALM, "cowboy").
+
+getPasswordByUsername(<<"username">>) -> "password"; %%add multiple users here
+getPasswordByUsername(_) -> unknown.
 
 execute(Req, State) ->
     case isPublic(cowboy_req:path(Req)) of
@@ -25,8 +26,10 @@ digestAuthentication(Req, State) ->
             RealUri = getDigestUri(Req), %% the authentication header has a property that describes the uri, but we don't trust the user
             Response = erlang:binary_to_list(proplists:get_value(<<"response">>, Props)),
             Opaque = erlang:binary_to_list(proplists:get_value(<<"opaque">>, Props)),
-            case digestHash(getUsername(), Realm, getPassword(), Method, RealUri, Nonce) of
-                Response -> 
+            Username = proplists:get_value(<<"username">>, Props),
+            Password = getPasswordByUsername(Username),
+            case digestHash(Username, Realm, Password, Method, RealUri, Nonce) of
+                Response -> %%the result of the digestHash matches the "response" parameter that the user sent
                     Req1 = setDigestHeader(Req, Opaque),
                     {ok, Req1, State};
                 _ ->
@@ -34,29 +37,32 @@ digestAuthentication(Req, State) ->
                     {stop, cowboy_req:reply(401, Req1)}
             end; 
 	    _ ->
-	        Req1 = setDigestHeader(Req, erlang:integer_to_list(rand:uniform(?MAXNOONCE), 16)),
+	        Req1 = setDigestHeader(Req, getRandomNonce()),
             {stop, cowboy_req:reply(401, Req1)}
             
     end.
 
+getRandomNonce() ->
+    toHex(rand:bytes(8)).
+
 setDigestHeader(Req, Opaque) ->
-    Nonce = rand:uniform(?MAXNOONCE),
-    Str = erlang:integer_to_list(Nonce, 16),
-    Bin =  erlang:list_to_binary(["digest realm=\"cowboy\", nonce=\"", Str, "\", opaque=\"",Opaque,"\""]),
-    cowboy_req:set_resp_header(<<"www-authenticate">>, Bin, Req).
+    Nonce = getRandomNonce(),
+    AuthenticateHeader =  erlang:list_to_binary(["digest realm=", $", ?REALM, $", ", nonce=", $", Nonce, $", ", opaque=", $", Opaque, $"]),
+    cowboy_req:set_resp_header(<<"www-authenticate">>, AuthenticateHeader, Req).
 
 getDigestUri(Req) ->
-    A = cowboy_req:path(Req),
+    Path = cowboy_req:path(Req),
     case cowboy_req:qs(Req) of
         <<>> ->
-            A;
-        B when is_binary(B) ->
-            <<A/binary, "?", B/binary>>
+            Path;
+        QueryString when is_binary(QueryString) ->
+            <<Path/binary, $?, QueryString/binary>>
     end.
 
 isPublic(_) ->
     false.
 
+digestHash(_, _, unknown, _, _, _) -> unknown;
 digestHash(Username, Realm, Password, Method, DigestUri, Nonce) -> 
     HA1 = toHex(erlang:md5([Username, ":", Realm, ":", Password])),
     HA2 = toHex(erlang:md5([Method, ":", DigestUri])),
@@ -69,12 +75,6 @@ hexChar(Num) when Num < 10 andalso Num >= 0->
     $0 + Num;
 hexChar(Num) when Num < 16 -> 
     $a + Num - 10.
-
-getUsername() ->
-    ?USERNAME.
-
-getPassword() ->
-    ?PASSWORD.
 
 %TESTS
 

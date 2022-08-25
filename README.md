@@ -6,9 +6,10 @@ An example Cowboy application with digest authentication.
 Run
 -----
 
-    $ rebar3 run
+    $ rebar3 shell
+
 
 Go to http://localhost:8080
 
-username: username
+username: username  
 password: password
